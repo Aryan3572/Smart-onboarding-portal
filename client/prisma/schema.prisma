@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  user      User[]
+  employees  Employee[]
+  checklists Checklist[]
+
+  teams Team[]
+}
+
+model Employee {
+  id       String @id @default(cuid())
+  name     String 
+  email    String
+  role     String
+  progress Int    @default(0)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete:Cascade)
+
+  createdAt DateTime @default(now())
+
+  EmployeeChecklist EmployeeChecklist[]
+  tasks             Task[]
+  userId            String?             @unique
+  user              User?               @relation("User_Employee", fields: [userId], references: [id])
+
+  hrId String?
+  hr   User?   @relation("HR_Employees", fields: [hrId], references: [id])
+
+  documents Document[]
+
+  teamId String?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+}
+
+model Checklist {
+  id        String  @id @default(cuid())
+  title     String  
+
+   // 🔥 ADD THESE TWO LINES
+  teamId    String?
+  team      Team?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete:Cascade)
+
+  items ChecklistItem[]
+
+  @@unique([title, companyId])
+}
+
+model EmployeeChecklist {
+  id              String  @id @default(cuid())
+  employeeId      String
+  checklistItemId String
+  completed       Boolean @default(false)
+
+  employee      Employee      @relation(fields: [employeeId], references: [id], onDelete:Cascade)
+  checklistItem ChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+  @@unique([employeeId, checklistItemId]) // 🔥 ADD THIS
+
+  warning   String?
+}
+
+model ChecklistItem {
+  id                String              @id @default(cuid())
+  title             String
+  checklistId       String
+  checklist         Checklist           @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  EmployeeChecklist EmployeeChecklist[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String // 'hr' | 'employee'
+  createdAt DateTime @default(now())
+
+  companyId String   // ✅ ADD THIS
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employees Employee[] @relation("HR_Employees") // only for HR (optional relation)
+  employee  Employee?  @relation("User_Employee")
+
+  documents Document[]
+}
+
+model Task {
+  id        String  @id @default(cuid())
+  title     String
+  completed Boolean @default(false)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileUrl     String
+  fileSizeKb  Int?
+  question    String?   // ❓ employee can ask HR
+  createdAt   DateTime  @default(now())
+
+  // 🔗 relation with employee
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // 🔗 optional: which HR handled it (future use)
+  hrId        String?
+  hr          User?     @relation(fields: [hrId], references: [id])
+  checklistItemId String?   // 🔥 ADD THIS
+
+  response     String?   // yes / no / mail / discord
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String   // Tech / Operations / Support
+
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  checklists Checklist[]
+  employees  Employee[]
+
+  @@unique([name, companyId]) // same team name per company only once
+}
