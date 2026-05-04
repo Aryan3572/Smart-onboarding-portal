@@ -64,7 +64,7 @@ function writeDashboardCache(key: string, value: unknown) {
 
 export const Route = createFileRoute("/dashboard")({
 	beforeLoad: async () => {
-		const res = await fetch("http://localhost:3000/api/auth/me", {
+		const res = await fetch("https://smart-onboarding-portal.vercel.app/api/auth/me", {
 			credentials: "include",
 			cache: "no-store",
 		});
