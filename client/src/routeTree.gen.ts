@@ -42,6 +42,8 @@ import { Route as ApiAuthMeRouteImport } from './routes/api/auth/me'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api/auth/logout'
 import { Route as ApiAuthLoginRouteImport } from './routes/api/auth/login'
 import { Route as ApiAuthChangePasswordRouteImport } from './routes/api/auth/change-password'
+import { Route as ApiDocumentViewIdRouteImport } from './routes/api/document/view/$id'
+import { Route as ApiDocumentDownloadIdRouteImport } from './routes/api/document/download/$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -211,6 +213,16 @@ const ApiAuthChangePasswordRoute = ApiAuthChangePasswordRouteImport.update({
   path: '/api/auth/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDocumentViewIdRoute = ApiDocumentViewIdRouteImport.update({
+  id: '/api/document/view/$id',
+  path: '/api/document/view/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDocumentDownloadIdRoute = ApiDocumentDownloadIdRouteImport.update({
+  id: '/api/document/download/$id',
+  path: '/api/document/download/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -246,6 +258,8 @@ export interface FileRoutesByFullPath {
   '/dasboard/employee/$id': typeof DasboardEmployeeIdRoute
   '/dasboard/employee/employee': typeof DasboardEmployeeEmployeeRoute
   '/dasboard/settings/setting': typeof DasboardSettingsSettingRoute
+  '/api/document/download/$id': typeof ApiDocumentDownloadIdRoute
+  '/api/document/view/$id': typeof ApiDocumentViewIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -281,6 +295,8 @@ export interface FileRoutesByTo {
   '/dasboard/employee/$id': typeof DasboardEmployeeIdRoute
   '/dasboard/employee/employee': typeof DasboardEmployeeEmployeeRoute
   '/dasboard/settings/setting': typeof DasboardSettingsSettingRoute
+  '/api/document/download/$id': typeof ApiDocumentDownloadIdRoute
+  '/api/document/view/$id': typeof ApiDocumentViewIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -317,6 +333,8 @@ export interface FileRoutesById {
   '/dasboard/employee/$id': typeof DasboardEmployeeIdRoute
   '/dasboard/employee/employee': typeof DasboardEmployeeEmployeeRoute
   '/dasboard/settings/setting': typeof DasboardSettingsSettingRoute
+  '/api/document/download/$id': typeof ApiDocumentDownloadIdRoute
+  '/api/document/view/$id': typeof ApiDocumentViewIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -354,6 +372,8 @@ export interface FileRouteTypes {
     | '/dasboard/employee/$id'
     | '/dasboard/employee/employee'
     | '/dasboard/settings/setting'
+    | '/api/document/download/$id'
+    | '/api/document/view/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -389,6 +409,8 @@ export interface FileRouteTypes {
     | '/dasboard/employee/$id'
     | '/dasboard/employee/employee'
     | '/dasboard/settings/setting'
+    | '/api/document/download/$id'
+    | '/api/document/view/$id'
   id:
     | '__root__'
     | '/'
@@ -424,6 +446,8 @@ export interface FileRouteTypes {
     | '/dasboard/employee/$id'
     | '/dasboard/employee/employee'
     | '/dasboard/settings/setting'
+    | '/api/document/download/$id'
+    | '/api/document/view/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -460,6 +484,8 @@ export interface RootRouteChildren {
   DasboardEmployeeIdRoute: typeof DasboardEmployeeIdRoute
   DasboardEmployeeEmployeeRoute: typeof DasboardEmployeeEmployeeRoute
   DasboardSettingsSettingRoute: typeof DasboardSettingsSettingRoute
+  ApiDocumentDownloadIdRoute: typeof ApiDocumentDownloadIdRoute
+  ApiDocumentViewIdRoute: typeof ApiDocumentViewIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -695,6 +721,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/document/view/$id': {
+      id: '/api/document/view/$id'
+      path: '/api/document/view/$id'
+      fullPath: '/api/document/view/$id'
+      preLoaderRoute: typeof ApiDocumentViewIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/document/download/$id': {
+      id: '/api/document/download/$id'
+      path: '/api/document/download/$id'
+      fullPath: '/api/document/download/$id'
+      preLoaderRoute: typeof ApiDocumentDownloadIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -732,6 +772,8 @@ const rootRouteChildren: RootRouteChildren = {
   DasboardEmployeeIdRoute: DasboardEmployeeIdRoute,
   DasboardEmployeeEmployeeRoute: DasboardEmployeeEmployeeRoute,
   DasboardSettingsSettingRoute: DasboardSettingsSettingRoute,
+  ApiDocumentDownloadIdRoute: ApiDocumentDownloadIdRoute,
+  ApiDocumentViewIdRoute: ApiDocumentViewIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

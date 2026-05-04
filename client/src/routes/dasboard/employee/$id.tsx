@@ -1,15 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import Modal from "@/components/modal";
 import {
 	AlertTriangle,
 	CheckCircle2,
 	Circle,
 	Download,
+	Eye,
 	FileText,
 	MessageSquareText,
 	Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import Modal from "@/components/modal";
 
 export const Route = createFileRoute("/dasboard/employee/$id")({
 	component: Page,
@@ -484,15 +485,24 @@ function ChecklistRow({
 										</div>
 
 										{canOpen ? (
-											<a
-												href={doc.fileUrl}
-												target="_blank"
-												rel="noreferrer"
-												className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-extrabold text-white no-underline shadow-[0_10px_20px_rgba(5,150,105,0.18)] hover:bg-emerald-700"
-											>
-												<Download size={14} aria-hidden="true" />
-												View document
-											</a>
+											<div className="flex shrink-0 flex-wrap gap-2">
+												<a
+													href={`/api/document/view/${encodeURIComponent(doc.id)}`}
+													target="_blank"
+													rel="noreferrer"
+													className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-extrabold text-white no-underline shadow-[0_10px_20px_rgba(5,150,105,0.18)] hover:bg-emerald-700"
+												>
+													<Eye size={14} aria-hidden="true" />
+													View
+												</a>
+												<a
+													href={`/api/document/download/${encodeURIComponent(doc.id)}`}
+													className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-extrabold text-emerald-800 no-underline hover:bg-emerald-50"
+												>
+													<Download size={14} aria-hidden="true" />
+													Download
+												</a>
+											</div>
 										) : doc.question ? (
 											<span className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600">
 												Text only
