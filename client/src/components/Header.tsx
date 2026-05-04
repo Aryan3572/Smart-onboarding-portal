@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowLeft, Home, Info, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Home, Info, LogOut, Mail } from "lucide-react";
 
 export default function Header() {
 	const navigate = useNavigate();
@@ -51,9 +51,11 @@ export default function Header() {
 
 					{isAuthPage ? (
 						<span className="inline-flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-extrabold text-blue-950 shadow-sm">
-							<span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-700 text-white shadow-[0_8px_18px_rgba(37,99,235,0.24)]">
-								<ShieldCheck size={16} aria-hidden="true" />
-							</span>
+							<img
+								src="/smart-onboarding-logo.svg"
+								alt=""
+								className="h-7 w-7 rounded-lg shadow-[0_8px_18px_rgba(37,99,235,0.24)]"
+							/>
 							<span className="truncate">Smart Onboarding Portal</span>
 						</span>
 					) : (
@@ -61,9 +63,11 @@ export default function Header() {
 							to="/dashboard"
 							className="inline-flex min-w-0 items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-extrabold text-blue-950 no-underline shadow-sm transition hover:border-blue-200 hover:bg-blue-100 sm:gap-3 sm:px-4"
 						>
-							<span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-700 text-white shadow-[0_8px_18px_rgba(37,99,235,0.24)]">
-								<ShieldCheck size={16} aria-hidden="true" />
-							</span>
+							<img
+								src="/smart-onboarding-logo.svg"
+								alt=""
+								className="h-7 w-7 rounded-lg shadow-[0_8px_18px_rgba(37,99,235,0.24)]"
+							/>
 							<span className="truncate">Smart Onboarding Portal</span>
 						</Link>
 					)}

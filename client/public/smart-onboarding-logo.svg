@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Smart Onboarding Portal logo</title>
+  <desc id="desc">A blue shield with a white check mark.</desc>
+  <defs>
+    <linearGradient id="shieldGradient" x1="13" x2="51" y1="6" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="shadow" x="7" y="3" width="50" height="59" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0f172a" flood-opacity=".2" />
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#eff6ff" />
+  <path
+    fill="url(#shieldGradient)"
+    d="M32 7.5 51 14v15.1c0 12.5-7.5 22.9-19 27.4-11.5-4.5-19-14.9-19-27.4V14l19-6.5Z"
+    filter="url(#shadow)"
+  />
+  <path
+    fill="none"
+    stroke="#fff"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="6"
+    d="m22.5 32.4 6.4 6.4 13-15.1"
+  />
+</svg>
