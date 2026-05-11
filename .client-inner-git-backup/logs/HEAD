@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 859577e852457ed50a05de12b1c9545ae3f4e49f Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777316862 +0530	commit (initial): Initial commit
+859577e852457ed50a05de12b1c9545ae3f4e49f 0000000000000000000000000000000000000000 Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777316876 +0530	Branch: renamed refs/heads/master to refs/heads/main
+0000000000000000000000000000000000000000 859577e852457ed50a05de12b1c9545ae3f4e49f Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777316876 +0530	Branch: renamed refs/heads/master to refs/heads/main
+859577e852457ed50a05de12b1c9545ae3f4e49f ac47ed8afae8f684bf703def148c286ae406db9a Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777316904 +0530	pull origin main --rebase (start): checkout ac47ed8afae8f684bf703def148c286ae406db9a
+ac47ed8afae8f684bf703def148c286ae406db9a 8edc7ad85540971931ef2cabd556631d6cf8c1b8 Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777317127 +0530	commit: initial commit
+8edc7ad85540971931ef2cabd556631d6cf8c1b8 8edc7ad85540971931ef2cabd556631d6cf8c1b8 Aryan3572 <157047439+Aryan3572@users.noreply.github.com> 1777317190 +0530	rebase (finish): returning to refs/heads/main
