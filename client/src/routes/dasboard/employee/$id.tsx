@@ -3,13 +3,16 @@ import {
 	AlertTriangle,
 	CheckCircle2,
 	Circle,
+	Clock3,
 	Download,
 	Eye,
 	FileText,
+	Loader2,
 	MessageSquareText,
+	Send,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Modal from "@/components/modal";
 
 export const Route = createFileRoute("/dasboard/employee/$id")({
@@ -21,6 +24,7 @@ type RouteParams = {
 };
 
 const employeeDetailCacheTtl = 30_000;
+const monitoringIntervalMs = 30_000;
 
 function readEmployeeDetailCache(key: string) {
 	if (typeof window === "undefined") return null;
@@ -60,31 +64,52 @@ function Page() {
 	const [data, setData] = useState<any>(null);
 	const [removeOpen, setRemoveOpen] = useState(false);
 	const [removing, setRemoving] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
+	const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+	const [syncError, setSyncError] = useState("");
+	const hasLoadedEmployeeDetail = useRef(false);
 
-	const fetchData = async () => {
+	const fetchData = useCallback(async (options?: { silent?: boolean }) => {
 		const cacheKey = `employee-detail-cache:${id}`;
 		const cached = readEmployeeDetailCache(cacheKey);
-		if (cached && !data) {
+		if (cached && !hasLoadedEmployeeDetail.current && !options?.silent) {
 			setData(cached);
+			hasLoadedEmployeeDetail.current = true;
 		}
+		if (options?.silent) setRefreshing(true);
+		setSyncError("");
 
-		const res = await fetch(`/api/employee/${encodeURIComponent(id)}`, {
-			credentials: "include",
-		});
+		try {
+			const res = await fetch(`/api/employee/${encodeURIComponent(id)}`, {
+				credentials: "include",
+				cache: "no-store",
+			});
 
-		if (!res.ok) {
-			setData({ error: res.status === 401 ? "Unauthorized" : "Error" });
-			return;
+			if (!res.ok) {
+				setData({ error: res.status === 401 ? "Unauthorized" : "Error" });
+				return;
+			}
+
+			const employeeData = await res.json();
+			setData(employeeData);
+			hasLoadedEmployeeDetail.current = true;
+			setLastSyncedAt(new Date());
+			writeEmployeeDetailCache(cacheKey, employeeData);
+		} catch {
+			setSyncError("Live monitoring paused. Refreshing again soon.");
+		} finally {
+			setRefreshing(false);
 		}
-
-		const employeeData = await res.json();
-		setData(employeeData);
-		writeEmployeeDetailCache(cacheKey, employeeData);
-	};
+	}, [id]);
 
 	useEffect(() => {
 		fetchData();
-	}, [id]);
+		const intervalId = window.setInterval(() => {
+			fetchData({ silent: true });
+		}, monitoringIntervalMs);
+
+		return () => window.clearInterval(intervalId);
+	}, [fetchData]);
 
 	if (!data) {
 		return (
@@ -157,6 +182,15 @@ function Page() {
 		navigate({ to: "/dashboard" });
 	};
 
+	const updateDocumentResponse = (docId: string, response: string) => {
+		setData((prev: any) => ({
+			...prev,
+			documents: (prev.documents || []).map((doc: any) =>
+				doc.id === docId ? { ...doc, response, question: null } : doc,
+			),
+		}));
+	};
+
 	return (
 		<div className="min-h-[80vh] bg-gradient-to-br from-white via-blue-50 to-slate-100">
 			<div className="mx-auto flex w-full max-w-5xl flex-col gap-6 rounded-lg border border-blue-100 bg-white p-4 shadow-[0_24px_60px_rgba(30,64,175,0.1)] sm:p-8">
@@ -168,6 +202,12 @@ function Page() {
 						Employee Details
 					</h1>
 				</div>
+
+				<MonitoringStatus
+					refreshing={refreshing}
+					lastSyncedAt={lastSyncedAt}
+					error={syncError}
+				/>
 
 				<section className="rounded-lg border border-blue-100 bg-white p-4 shadow-[0_12px_30px_rgba(30,64,175,0.06)]">
 					<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -269,6 +309,7 @@ function Page() {
 											employeeId={id}
 											updateItemState={updateItemState}
 											documents={documentsByItem[item.checklistItemId] || []}
+											onResponseSaved={updateDocumentResponse}
 										/>
 									))}
 								</div>
@@ -330,11 +371,16 @@ function ChecklistRow({
 	employeeId,
 	updateItemState,
 	documents = [],
+	onResponseSaved,
 }: any) {
 	const [warningOpen, setWarningOpen] = useState(false);
 	const [warningMessage, setWarningMessage] = useState("");
 	const [warningSending, setWarningSending] = useState(false);
 	const [localWarning, setLocalWarning] = useState(item.warning || "");
+	const [responseDrafts, setResponseDrafts] = useState<Record<string, string>>(
+		{},
+	);
+	const [respondingDocId, setRespondingDocId] = useState("");
 
 	const requiresUpload = item.checklistItem.requiresUpload;
 	const hasDocuments = documents.length > 0;
@@ -383,6 +429,30 @@ function ChecklistRow({
 		setWarningMessage("");
 		setWarningOpen(false);
 		setWarningSending(false);
+	};
+
+	const handleResponseSubmit = async (docId: string) => {
+		const response = responseDrafts[docId]?.trim();
+		if (!response) return;
+
+		setRespondingDocId(docId);
+
+		const res = await fetch("/api/document/respond", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			credentials: "include",
+			body: JSON.stringify({ docId, response }),
+		});
+
+		setRespondingDocId("");
+
+		if (!res.ok) {
+			alert("Could not send feedback. Please try again.");
+			return;
+		}
+
+		onResponseSaved(docId, response);
+		setResponseDrafts((prev) => ({ ...prev, [docId]: "" }));
 	};
 
 	return (
@@ -522,6 +592,58 @@ function ChecklistRow({
 											</p>
 										</div>
 									)}
+
+									{doc.response ? (
+										<div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+											<p className="text-xs font-extrabold uppercase tracking-[0.12em] text-blue-800">
+												Feedback sent
+											</p>
+											<p className="mt-1 text-sm font-semibold leading-5 text-slate-700">
+												{doc.response}
+											</p>
+										</div>
+									) : (
+										<div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+											<label
+												htmlFor={`response-${doc.id}`}
+												className="text-xs font-extrabold uppercase tracking-[0.12em] text-blue-800"
+											>
+												Send feedback
+											</label>
+											<textarea
+												id={`response-${doc.id}`}
+												value={responseDrafts[doc.id] || ""}
+												onChange={(e) =>
+													setResponseDrafts((prev) => ({
+														...prev,
+														[doc.id]: e.target.value,
+													}))
+												}
+												placeholder="Write a short response for the employee..."
+												className="mt-2 min-h-20 w-full resize-none rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+											/>
+											<button
+												type="button"
+												onClick={() => handleResponseSubmit(doc.id)}
+												disabled={
+													!responseDrafts[doc.id]?.trim() ||
+													respondingDocId === doc.id
+												}
+												className="mt-2 inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-extrabold text-white shadow-[0_10px_20px_rgba(37,99,235,0.18)] transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+											>
+												{respondingDocId === doc.id ? (
+													<Loader2
+														size={14}
+														className="animate-spin"
+														aria-hidden="true"
+													/>
+												) : (
+													<Send size={14} aria-hidden="true" />
+												)}
+												Send
+											</button>
+										</div>
+									)}
 								</div>
 							);
 						})}
@@ -593,6 +715,43 @@ function ChecklistRow({
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+function MonitoringStatus({
+	refreshing,
+	lastSyncedAt,
+	error,
+}: {
+	refreshing: boolean;
+	lastSyncedAt: Date | null;
+	error: string;
+}) {
+	return (
+		<div
+			className={`flex flex-col gap-2 rounded-lg border px-4 py-3 text-sm font-bold shadow-[0_10px_24px_rgba(30,64,175,0.05)] sm:flex-row sm:items-center sm:justify-between ${
+				error
+					? "border-amber-200 bg-amber-50 text-amber-900"
+					: "border-blue-100 bg-blue-50/50 text-slate-700"
+			}`}
+		>
+			<span className="inline-flex items-center gap-2">
+				{refreshing ? (
+					<Loader2 size={16} className="animate-spin text-blue-700" />
+				) : (
+					<Clock3 size={16} className="text-blue-700" />
+				)}
+				{error || (refreshing ? "Refreshing employee record..." : "Live monitoring active")}
+			</span>
+			<span className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+				{lastSyncedAt
+					? `Last synced ${lastSyncedAt.toLocaleTimeString([], {
+							hour: "2-digit",
+							minute: "2-digit",
+						})}`
+					: "Sync starting"}
+			</span>
 		</div>
 	);
 }

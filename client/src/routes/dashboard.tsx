@@ -1,7 +1,14 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import Sidebar, { MobileDashboardNav } from "@/components/sidebar";
 import Modal from "@/components/modal";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import {
+	type FormEvent,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { z } from "zod";
 import {
 	AlertTriangle,
@@ -9,9 +16,10 @@ import {
 	ChevronRight,
 	Circle,
 	ClipboardCheck,
-	FileText,
+	Clock3,
 	Eye,
 	EyeOff,
+	FileText,
 	KeyRound,
 	Loader2,
 	Send,
@@ -29,6 +37,7 @@ const employeeSchema = z.object({
 
 const dashboardCachePrefix = "dashboard-cache:";
 const dashboardCacheTtl = 30_000;
+const monitoringIntervalMs = 30_000;
 
 function readDashboardCache(key: string) {
 	if (typeof window === "undefined") return null;
@@ -82,7 +91,12 @@ function DashboardLayout() {
 	const [employees, setEmployees] = useState<any[]>([]);
 	const [employeeSelf, setEmployeeSelf] = useState<any>(null);
 	const [employeeChecklist, setEmployeeChecklist] = useState<any>({});
+	const [employeeDocuments, setEmployeeDocuments] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
+	const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+	const [syncError, setSyncError] = useState("");
+	const hasLoadedDashboardData = useRef(false);
 	const [role, setRole] = useState<"hr" | "employee" | null>(null);
 	const [form, setForm] = useState({
 		name: "",
@@ -144,73 +158,112 @@ function DashboardLayout() {
 	};
 	const navigate = useNavigate();
 
-	const fetchData = async () => {
-		const hasCachedData = employees.length > 0 || employeeSelf;
-		if (!hasCachedData) setLoading(true);
+	const fetchData = useCallback(async (options?: { silent?: boolean }) => {
+		const hasCachedData = hasLoadedDashboardData.current;
+		if (!hasCachedData && !options?.silent) setLoading(true);
+		if (options?.silent) setRefreshing(true);
+		setSyncError("");
 
-		const res = await fetch("/api/employee/me", {
-			credentials: "include",
-			cache: "no-store",
-		});
-
-		if (!res.ok) {
-			window.sessionStorage.clear();
-			navigate({ to: "/login" });
-			return;
-		}
-
-		const data = await res.json();
-		const cacheKey = `${dashboardCachePrefix}${data.role}:${data.userId}`;
-		const cached = readDashboardCache(cacheKey);
-
-		setRole(data.role);
-
-		if (data.role === "hr") {
-			setEmployeeSelf(null);
-			setEmployeeChecklist({});
-
-			if (cached?.employees?.length && !hasCachedData) {
-				setEmployees(cached.employees);
-				setLoading(false);
-			}
-
-			setEmployees(data.employees || []);
-			writeDashboardCache(cacheKey, {
-				employees: data.employees || [],
-			});
-		}
-
-		if (data.role === "employee") {
-			setEmployees([]);
-			setEmployeeSelf(data.self);
-			if (cached?.employeeChecklist && !hasCachedData) {
-				setEmployeeChecklist(cached.employeeChecklist);
-				setLoading(false);
-			}
-
-			const checklistRes = await fetch(`/api/employee/${data.self.id}`, {
+		try {
+			const res = await fetch("/api/employee/me", {
 				credentials: "include",
 				cache: "no-store",
 			});
 
-			const checklistData = await checklistRes.json();
-			setEmployeeChecklist(checklistData.checklist || {});
-			writeDashboardCache(cacheKey, {
-				employeeChecklist: checklistData.checklist || {},
-			});
-		}
+			if (!res.ok) {
+				window.sessionStorage.clear();
+				navigate({ to: "/login" });
+				return;
+			}
 
-		setLoading(false);
-	};
+			const data = await res.json();
+			const cacheKey = `${dashboardCachePrefix}${data.role}:${data.userId}`;
+			const cached = readDashboardCache(cacheKey);
+
+			setRole(data.role);
+
+			if (data.role === "hr") {
+				setEmployeeSelf(null);
+				setEmployeeChecklist({});
+				setEmployeeDocuments([]);
+
+				if (cached?.employees?.length && !hasCachedData) {
+					setEmployees(cached.employees);
+					hasLoadedDashboardData.current = true;
+					setLoading(false);
+				}
+
+				setEmployees(data.employees || []);
+				hasLoadedDashboardData.current = true;
+				writeDashboardCache(cacheKey, {
+					employees: data.employees || [],
+				});
+			}
+
+			if (data.role === "employee") {
+				setEmployees([]);
+				setEmployeeSelf(data.self);
+				if (cached?.employeeChecklist && !hasCachedData) {
+					setEmployeeChecklist(cached.employeeChecklist);
+					setEmployeeDocuments(cached.employeeDocuments || []);
+					hasLoadedDashboardData.current = true;
+					setLoading(false);
+				}
+
+				const checklistRes = await fetch(`/api/employee/${data.self.id}`, {
+					credentials: "include",
+					cache: "no-store",
+				});
+
+				if (!checklistRes.ok) {
+					throw new Error("Could not refresh checklist.");
+				}
+
+				const checklistData = await checklistRes.json();
+				setEmployeeChecklist(checklistData.checklist || {});
+				setEmployeeDocuments(checklistData.documents || []);
+				hasLoadedDashboardData.current = true;
+				writeDashboardCache(cacheKey, {
+					employeeChecklist: checklistData.checklist || {},
+					employeeDocuments: checklistData.documents || [],
+				});
+			}
+
+			setLastSyncedAt(new Date());
+			setLoading(false);
+		} catch (error) {
+			setSyncError("Live monitoring paused. Refreshing again soon.");
+			if (!hasCachedData) setLoading(false);
+		} finally {
+			setRefreshing(false);
+		}
+	}, [navigate]);
 
 	useEffect(() => {
 		fetchData();
-	}, []);
+		const intervalId = window.setInterval(() => {
+			fetchData({ silent: true });
+		}, monitoringIntervalMs);
+
+		return () => window.clearInterval(intervalId);
+	}, [fetchData]);
 
 	const allItems = Object.values(employeeChecklist).flat() as any[];
 	const completed = allItems.filter((i: any) => i.completed).length;
 	const total = allItems.length;
 	const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+	const warningCount = allItems.filter(
+		(item: any) => item.warning && !item.completed,
+	).length;
+	const documentsByItem = employeeDocuments.reduce(
+		(acc: Record<string, any[]>, doc: any) => {
+			if (!doc.checklistItemId) return acc;
+			if (!acc[doc.checklistItemId]) acc[doc.checklistItemId] = [];
+			acc[doc.checklistItemId].push(doc);
+			return acc;
+		},
+		{},
+	);
 
 	const updateEmployeeProgress = (
 		employeeId: string,
@@ -269,6 +322,12 @@ function DashboardLayout() {
 					)}
 				</div>
 
+				<MonitoringStatus
+					refreshing={refreshing}
+					lastSyncedAt={lastSyncedAt}
+					error={syncError}
+				/>
+
 				{role === "hr" && (
 					<section className="rounded-lg border border-blue-100 bg-white p-4 shadow-[0_20px_50px_rgba(30,64,175,0.08)] sm:p-6">
 						<div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -286,6 +345,17 @@ function DashboardLayout() {
 										onboarding
 									</p>
 								</div>
+							</div>
+							<div className="grid grid-cols-2 gap-2 sm:w-auto sm:grid-cols-3">
+								<MetricPill label="Employees" value={employees.length} />
+								<MetricPill
+									label="At risk"
+									value={employees.filter((emp) => emp.progress < 50).length}
+								/>
+								<MetricPill
+									label="Complete"
+									value={employees.filter((emp) => emp.progress >= 100).length}
+								/>
 							</div>
 						</div>
 
@@ -417,11 +487,20 @@ function DashboardLayout() {
 											item={item}
 											setEmployeeChecklist={setEmployeeChecklist}
 											updateEmployeeProgress={updateEmployeeProgress}
+											documents={documentsByItem[item.checklistItemId] || []}
 										/>
 									))
 								)}
 							</div>
 						</div>
+
+						{warningCount > 0 && (
+							<div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
+								{warningCount} checklist{" "}
+								{warningCount === 1 ? "item needs" : "items need"} attention
+								from HR feedback.
+							</div>
+						)}
 					</section>
 				)}
 			</main>
@@ -700,6 +779,54 @@ function StatusPanel({ icon, text }: { icon: ReactNode; text: string }) {
 	);
 }
 
+function MonitoringStatus({
+	refreshing,
+	lastSyncedAt,
+	error,
+}: {
+	refreshing: boolean;
+	lastSyncedAt: Date | null;
+	error: string;
+}) {
+	return (
+		<div
+			className={`mb-5 flex flex-col gap-2 rounded-lg border px-4 py-3 text-sm font-bold shadow-[0_10px_24px_rgba(30,64,175,0.05)] sm:flex-row sm:items-center sm:justify-between ${
+				error
+					? "border-amber-200 bg-amber-50 text-amber-900"
+					: "border-blue-100 bg-white text-slate-700"
+			}`}
+		>
+			<span className="inline-flex items-center gap-2">
+				{refreshing ? (
+					<Loader2 size={16} className="animate-spin text-blue-700" />
+				) : (
+					<Clock3 size={16} className="text-blue-700" />
+				)}
+				{error || (refreshing ? "Refreshing live monitoring..." : "Live monitoring active")}
+			</span>
+			<span className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+				{lastSyncedAt
+					? `Last synced ${lastSyncedAt.toLocaleTimeString([], {
+							hour: "2-digit",
+							minute: "2-digit",
+						})}`
+					: "Sync starting"}
+			</span>
+		</div>
+	);
+}
+
+function MetricPill({ label, value }: { label: string; value: number }) {
+	return (
+		<div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-center">
+			<p className="text-lg font-extrabold leading-none text-blue-800">{value}</p>
+			<p className="mt-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+				{label}
+			</p>
+		</div>
+	);
+}
+
 function ProgressBar({ value }: { value: number }) {
 	return (
 		<div className="h-2.5 w-full overflow-hidden rounded-full bg-blue-100">
@@ -717,6 +844,7 @@ function ChecklistRow({
 	item,
 	setEmployeeChecklist,
 	updateEmployeeProgress,
+	documents = [],
 }: any) {
 	const [file, setFile] = useState<File | null>(null);
 	const [note, setNote] = useState("");
@@ -729,6 +857,7 @@ function ChecklistRow({
 		Boolean(item.checklistItem.requiresUpload) ||
 		Boolean(item.warning) ||
 		/upload|submit|document|proof|file|attachment/i.test(title);
+	const latestResponse = documents.find((doc: any) => doc.response)?.response;
 
 	const updateState = (completed: boolean) => {
 		setEmployeeChecklist((prev: any) => {
@@ -874,6 +1003,24 @@ function ChecklistRow({
 							</p>
 							<p className="mt-1 text-sm font-semibold leading-5 text-amber-900">
 								{item.warning}
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{latestResponse && (
+				<div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 shadow-sm">
+					<div className="flex items-start gap-2">
+						<span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+							<CheckCircle2 size={14} aria-hidden="true" />
+						</span>
+						<div>
+							<p className="text-xs font-extrabold uppercase tracking-[0.12em] text-emerald-800">
+								HR Feedback
+							</p>
+							<p className="mt-1 text-sm font-semibold leading-5 text-emerald-900">
+								{latestResponse}
 							</p>
 						</div>
 					</div>
